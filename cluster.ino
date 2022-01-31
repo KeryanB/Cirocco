@@ -10,11 +10,11 @@
 //  Configuration  //
 /////////////////////
 
-#define CS_PIN_CAN0 9
-#define CS_PIN_CAN1 10
+#define CS_PIN_CAN0 8
+#define CS_PIN_CAN1 9
 #define SERIAL_SPEED 115200
 #define CAN_SPEED CAN_125KBPS // Diagnostic CAN bus - High Speed
-#define CAN_FREQ MCP_8MHZ // Switch to 16MHZ if you have a 16Mhz module
+#define CAN_FREQ MCP_16MHZ // Switch to 16MHZ if you have a 16Mhz module
 
 ////////////////////
 // Initialization //
@@ -30,17 +30,9 @@ MCP2515 CAN1(CS_PIN_CAN1); // CAN-BUS Shield N°2
 // My variables
 bool debugCAN0 = false;
 bool debugCAN1 = false;
-int ESPPin = 8;
-int ClusterPin =7;
-int ESPLed = 3;
 bool SerialEnabled = true;
-
-int counter = 0;
-long previousread;
-long lastpushed;
-long lastESP;
-long lastCluster;
 int modes = 0x00;
+long lastmode;
 
 // CAN-BUS Messages
 struct can_frame canMsgSnd;
@@ -48,9 +40,6 @@ struct can_frame canMsgRcv;
 char tmp[4];
 
 void setup() {
-  pinMode(ESPPin, INPUT_PULLUP);
-  pinMode(ClusterPin, INPUT_PULLUP);
-  pinMode(ESPLed, OUTPUT);
   if (SerialEnabled) {
     // Initalize Serial for debug
     Serial.begin(SERIAL_SPEED);
@@ -77,14 +66,10 @@ void setup() {
     delay(100);
     Serial.println("*");
   }
+  lastmode=millis();
 }
 
 void loop() {
-  int tmpVal;
-   if ((millis()-previousread)>1000){
-    counter = 0;
-    previousread=millis();
-   }
   // Receive CAN messages from the car
   if (CAN0.readMessage( & canMsgRcv) == MCP2515::ERROR_OK) {
     int id = canMsgRcv.can_id;
@@ -107,39 +92,27 @@ void loop() {
 
       Serial.println();
     }
-    if (id == 0x227 && canMsgRcv.data[0]==0x10){
-      digitalWrite(ESPLed,HIGH);
-    Serial.print("LED ESP ON");
-    }
-    if (id == 0x227 && canMsgRcv.data[0]==0x00){
-      digitalWrite(ESPLed,LOW);
-    Serial.print("LED ESP OFF");
-    }
-    if (id == 0x0A2 && canMsgRcv.data[0]==0x00 && canMsgRcv.data[1]==0x00 && canMsgRcv.data[2]==0x00 && canMsgRcv.data[3]==0x00 && canMsgRcv.data[4]==0x00 && canMsgRcv.data[5]==0x00){
-      Serial.print("0A2 not send");
-    }
-    else if (id == 0x221 && len == 7 && canMsgRcv.data[0]==0x08){
-        counter +=1;
-        Serial.print("counter+=1");
-      if (counter >= 2){
-        if (modes >= 0x08){
-          modes == 0x01;
-        }
+    if (id == 0x21F && len == 3 && canMsgRcv.data[2]==0x40){
+      canMsgSnd.data[0] = canMsgRcv.data[0];
+      canMsgSnd.data[1] = canMsgRcv.data[1];
+      canMsgSnd.data[2] = 0x00;
+      canMsgSnd.can_id = 0x21F;
+      canMsgSnd.can_dlc = 3;
+      CAN1.sendMessage( & canMsgSnd);
+      if (millis()-lastmode > 500){
         modes+=1;
-        canMsgSnd.data[0] = 0x00;
-        canMsgSnd.data[1] = 0x00;
-        canMsgSnd.data[2] = 0x00;
+        lastmode=millis();}
+      }
+    else if (id == 0x0A2){
+        canMsgSnd.data[0] = canMsgRcv.data[0];
+        canMsgSnd.data[1] = canMsgRcv.data[1];
+        canMsgSnd.data[2] = canMsgRcv.data[2];
         canMsgSnd.data[3] = modes;
-        canMsgSnd.data[4] = 0x00;
-        canMsgSnd.data[5] = 0x00;
+        canMsgSnd.data[4] = canMsgRcv.data[4];
+        canMsgSnd.data[5] = canMsgRcv.data[5];
         canMsgSnd.can_id = 0x0A2;
         canMsgSnd.can_dlc = 6;
         CAN1.sendMessage( & canMsgSnd);
-        Serial.print("Mode changé");
-      }
-      else
-      {CAN1.sendMessage( & canMsgRcv);}
-      Serial.print("changement conso");
     }
     else {    
       CAN1.sendMessage( & canMsgRcv);  
@@ -170,39 +143,6 @@ void loop() {
 
       Serial.println();
     }
-
     CAN0.sendMessage( & canMsgRcv);
   }
-     if (millis()-lastESP > 500){
-    if (digitalRead(ESPPin) == LOW){
-        canMsgSnd.data[0] = 0x00;
-        canMsgSnd.data[1] = 0x00;
-        canMsgSnd.data[2] = 0x40;
-        canMsgSnd.data[3] = 0x00;
-        canMsgSnd.data[4] = 0x00;
-        canMsgSnd.can_id = 0x217;
-        canMsgSnd.can_dlc = 5;
-        CAN1.sendMessage( & canMsgSnd);
-        CAN0.sendMessage( & canMsgSnd);
-        Serial.print("ESP Send");
-      lastESP = millis();}
-   }
-   if (millis()-lastCluster > 500){
-    if (digitalRead(ClusterPin) == LOW){
-        if (modes >= 0x08){
-          modes == 0x01;
-        }
-        modes+=1;
-        canMsgSnd.data[0] = 0x00;
-        canMsgSnd.data[1] = 0x00;
-        canMsgSnd.data[2] = 0x00;
-        canMsgSnd.data[3] = modes;
-        canMsgSnd.data[4] = 0x00;
-        canMsgSnd.data[5] = 0x00;
-        canMsgSnd.can_id = 0x0A2;
-        canMsgSnd.can_dlc = 6;
-        CAN1.sendMessage( & canMsgSnd);
-        Serial.print("Mode changé");
-      lastCluster = millis();}
-   }
 }
