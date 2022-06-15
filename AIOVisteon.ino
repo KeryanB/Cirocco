@@ -129,19 +129,22 @@ void loop() {
       }
       else {CAN1.sendMessage( & canMsgRcv);}
     }
-    else if (id == 0x1E9 && bitRead(canMsgRcv.data[2],3)== 1){
-      canMsgSnd.data[0] = canMsgRcv.data[1];
-      canMsgSnd.data[1] = 0x10;
-      canMsgSnd.data[2] = 0x00;
-      canMsgSnd.data[3] = 0x00;
-      canMsgSnd.data[4] = 0x00;
-      canMsgSnd.data[5] = 0x00;
-      canMsgSnd.data[6] = 0x00;
-      canMsgSnd.data[7] = 0x00;
-      canMsgSnd.can_id = 0x268;
-      canMsgSnd.can_dlc = 8;
-      CAN1.sendMessage( & canMsgSnd);
+    else if (id == 0x1E9){
+      CAN1.sendMessage( & canMsgRcv);
+      if (bitRead(canMsgRcv.data[2],3)== 1){
+        canMsgSnd.data[0] = canMsgRcv.data[1];
+        canMsgSnd.data[1] = 0x10;
+        canMsgSnd.data[2] = 0x00;
+        canMsgSnd.data[3] = 0x00;
+        canMsgSnd.data[4] = 0x00;
+        canMsgSnd.data[5] = 0x00;
+        canMsgSnd.data[6] = 0x00;
+        canMsgSnd.data[7] = 0x00;
+        canMsgSnd.can_id = 0x268;
+        canMsgSnd.can_dlc = 8;
+        CAN1.sendMessage( & canMsgSnd);
       }
+     }
     else if (id == 0x2A8){
       CAN1.sendMessage( & canMsgRcv);
       if (bitRead(canMsgRcv.data[0],7)== 1){
